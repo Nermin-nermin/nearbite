@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Near Bite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  /* ---------- Tokens ---------- */
+  :root {
+    --paper: #F5F6F2;
+    --surface: #FFFFFF;
+    --ink: #1C2421;
+    --muted: #5E6A64;
+    --line: #DDE2DC;
+    --nar: #B8323F;       /* pomegranate accent */
+    --nar-soft: #F6E3E4;
+    --tea: #2F6B55;       /* secondary: tea green */
+    --tea-soft: #E2EEE8;
+    --radius: 10px;
+    --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --body: "Figtree", "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #141917;
+      --surface: #1C2320;
+      --ink: #E8ECE9;
+      --muted: #9AA7A0;
+      --line: #2E3834;
+      --nar: #E0616D;
+      --nar-soft: #3A2226;
+      --tea: #6DB595;
+      --tea-soft: #1F2F28;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #141917;
+    --surface: #1C2320;
+    --ink: #E8ECE9;
+    --muted: #9AA7A0;
+    --line: #2E3834;
+    --nar: #E0616D;
+    --nar-soft: #3A2226;
+    --tea: #6DB595;
+    --tea-soft: #1F2F28;
+    color-scheme: dark;
+  }
+
+  /* ---------- Base ---------- */
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 15px/1.5 var(--body);
+  }
+  button, input, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--nar); outline-offset: 2px; }
+
+  .app {
+    display: grid;
+    grid-template-columns: minmax(340px, 420px) 1fr;
+    height: 100%;
+  }
+
+  /* ---------- Sidebar ---------- */
+  .side {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border-right: 1px solid var(--line);
+    background: var(--paper);
+  }
+  .head {
+    display: grid;
+    gap: 14px;
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .brand {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  h1 {
+    margin: 0;
+    font: 700 28px/1 var(--display);
+    letter-spacing: -0.02em;
+  }
+  h1 span { color: var(--nar); }
+  .status {
+    font-size: 13px;
+    color: var(--muted);
+    min-height: 1.5em;
+  }
+  .status.err { color: var(--nar); }
+
+  .locate-row { display: flex; gap: 8px; }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 9px 14px;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: var(--surface);
+    cursor: pointer;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--muted); }
+  .btn.primary {
+    background: var(--nar);
+    border-color: var(--nar);
+    color: #fff;
+  }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn:disabled { opacity: .6; cursor: progress; }
+
+  .search { display: flex; gap: 8px; flex: 1; min-width: 0; }
+  .search input {
+    flex: 1;
+    min-width: 0;
+    padding: 9px 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+  .chip {
+    padding: 5px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: transparent;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .chip[aria-pressed="true"] {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--paper);
+  }
+  .chip .n {
+    font-family: var(--mono);
+    font-size: 11px;
+    opacity: .7;
+    margin-left: 4px;
+  }
+  .radius {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .radius select {
+    padding: 5px 8px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .radius label { display: flex; align-items: center; gap: 6px; }
+
+  /* ---------- Results list ---------- */
+  .list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 12px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .empty {
+    padding: 32px 12px;
+    color: var(--muted);
+    text-align: center;
+  }
+  .place {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 12px;
+    padding: 12px 10px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .place:hover, .place.active {
+    background: var(--surface);
+    border-color: var(--line);
+  }
+  .place .name {
+    font: 600 16px/1.3 var(--display);
+    overflow-wrap: anywhere;
+  }
+  .place .dist {
+    font-family: var(--mono);
+    font-size: 13px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .place .walk {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: right;
+    white-space: nowrap;
+  }
+  .place .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .tag {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: var(--tea-soft);
+    color: var(--tea);
+  }
+  .tag.restaurant { background: var(--nar-soft); color: var(--nar); }
+  .place .extra {
+    grid-column: 1 / -1;
+    font-size: 13px;
+    color: var(--muted);
+    display: none;
+    gap: 4px;
+    margin-top: 6px;
+  }
+  .place.active .extra { display: grid; }
+  .links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 4px; }
+  .links a { color: var(--nar); font-weight: 600; text-decoration: none; }
+  .links a:hover { text-decoration: underline; }
+
+  .foot {
+    padding: 10px 20px;
+    font-size: 11px;
+    color: var(--muted);
+    border-top: 1px solid var(--line);
+  }
+  .foot a { color: inherit; }
+
+  /* ---------- Map ---------- */
+  #map { height: 100%; width: 100%; background: var(--line); }
+  .pin {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,.35);
+  }
+  .pin.restaurant { background: #B8323F; }
+  .pin.other { background: #2F6B55; }
+  .pin.sel { width: 20px; height: 20px; outline: 3px solid rgba(184,50,63,.35); }
+  .me {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: #2563EB;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 6px rgba(37,99,235,.25);
+  }
+  .leaflet-popup-content { font-family: var(--body); }
+
+  /* ---------- Phone ---------- */
+  @media (max-width: 760px) {
+    .app {
+      grid-template-columns: 1fr;
+      grid-template-rows: 42vh 1fr;
+    }
+    .mapwrap { grid-row: 1; }
+    .side { grid-row: 2; border-right: 0; border-top: 1px solid var(--line); }
+    .head { padding: 14px 16px 12px; }
+    .list { padding-inline: 8px; }
+    h1 { font-size: 24px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="head">
+      <div class="brand">
+        <h1>Near<span>Bite</span></h1>
+      </div>
+      <div class="locate-row">
+        <button class="btn primary" id="locateBtn" type="button">Use my location</button>
+        <form class="search" id="searchForm">
+          <input id="searchInput" type="search" placeholder="…or type an address, e.g. Nizami St, Baku" aria-label="Search a place">
+          <button class="btn" type="submit">Go</button>
+        </form>
+      </div>
+      <div class="controls" id="chips" role="group" aria-label="Filter by type"></div>
+      <div class="radius">
+        <label for="radiusSel">Within
+          <select id="radiusSel">
+            <option value="300">300 m</option>
+            <option value="600">600 m</option>
+            <option value="1000" selected>1 km</option>
+            <option value="2000">2 km</option>
+            <option value="3000">3 km</option>
+          </select>
+        </label>
+        <label for="openOnly"><input type="checkbox" id="openOnly"> has opening hours listed</label>
+      </div>
+      <div class="status" id="status" aria-live="polite">Tap “Use my location”, search an address, or tap the map.</div>
+    </div>
+    <div class="list" id="list">
+      <div class="empty">No location yet.</div>
+    </div>
+    <div class="foot">
+      Place data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors, via Overpass API.
+    </div>
+  </aside>
+  <main class="mapwrap"><div id="map" aria-label="Map"></div></main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(() => {
+  // ---------- Config ----------
+  const DEFAULT_CENTER = [40.3777, 49.8920]; // Baku, Fountain Square
+  const OVERPASS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter"
+  ];
+  const WALK_M_PER_MIN = 80;
+
+  // Map OSM tags -> display category
+  const CATEGORIES = [
+    { key: "all",        label: "All" },
+    { key: "restaurant", label: "Restaurants" },
+    { key: "cafe",       label: "Cafés" },
+    { key: "fast_food",  label: "Fast food" },
+    { key: "bakery",     label: "Bakeries" },
+    { key: "bar",        label: "Bars & pubs" },
+    { key: "other",      label: "Other" }
+  ];
+
+  function categorize(tags) {
+    const a = tags.amenity, s = tags.shop;
+    if (a === "restaurant") return "restaurant";
+    if (a === "cafe") return "cafe";
+    if (a === "fast_food" || a === "food_court") return "fast_food";
+    if (s === "bakery" || s === "pastry" || s === "confectionery") return "bakery";
+    if (a === "bar" || a === "pub" || a === "biergarten") return "bar";
+    return "other"; // ice_cream, deli, etc.
+  }
+  const LABEL = {
+    restaurant: "Restaurant", cafe: "Café", fast_food: "Fast food",
+    bakery: "Bakery", bar: "Bar", other: "Food"
+  };
+
+  // ---------- State ----------
+  let center = null;
+  let places = [];
+  let filter = "all";
+  let selectedId = null;
+  let lastQueryKey = "";
+
+  // ---------- Elements ----------
+  const $ = (id) => document.getElementById(id);
+  const statusEl = $("status"), listEl = $("list"), chipsEl = $("chips");
+  const radiusSel = $("radiusSel"), openOnly = $("openOnly"), locateBtn = $("locateBtn");
+
+  // ---------- Map ----------
+  const map = L.map("map", { zoomControl: true }).setView(DEFAULT_CENTER, 14);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "© OpenStreetMap"
+  }).addTo(map);
+  const placeLayer = L.layerGroup().addTo(map);
+  let meMarker = null, radiusCircle = null;
+  const markers = new Map();
+
+  map.on("click", (e) => setCenter([e.latlng.lat, e.latlng.lng], "Picked point on map"));
+
+  // ---------- Helpers ----------
+  function setStatus(msg, isErr = false) {
+    statusEl.textContent = msg;
+    statusEl.classList.toggle("err", isErr);
+  }
+  function haversine([lat1, lon1], [lat2, lon2]) {
+    const R = 6371000, toRad = (d) => d * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+  function fmtDist(m) {
+    return m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`;
+  }
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  // ---------- Location sources ----------
+  locateBtn.addEventListener("click", () => {
+    if (!("geolocation" in navigator)) {
+      setStatus("This browser can't share location. Search an address instead.", true);
+      return;
+    }
+    locateBtn.disabled = true;
+    setStatus("Finding you…");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        locateBtn.disabled = false;
+        setCenter([pos.coords.latitude, pos.coords.longitude], "Your location");
+      },
+      (err) => {
+        locateBtn.disabled = false;
+        const why = err.code === 1
+          ? "Location permission was denied. Allow it in the browser, or search an address."
+          : "Couldn't get your location. Search an address or tap the map.";
+        setStatus(why, true);
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
+    );
+  });
+
+  $("searchForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const q = $("searchInput").value.trim();
+    if (!q) return;
+    setStatus(`Looking up “${q}”…`);
+    try {
+      const url = "https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encodeURIComponent(q);
+      const res = await fetch(url, { headers: { "Accept": "application/json" } });
+      const data = await res.json();
+      if (!data.length) { setStatus(`No match for “${q}”. Try a street and city.`, true); return; }
+      setCenter([+data[0].lat, +data[0].lon], data[0].display_name.split(",").slice(0, 2).join(","));
+    } catch {
+      setStatus("Address search failed. Check your connection and try again.", true);
+    }
+  });
+
+  radiusSel.addEventListener("change", () => { if (center) fetchPlaces(); });
+  openOnly.addEventListener("change", render);
+
+  function setCenter(latlng, label) {
+    center = latlng;
+    if (meMarker) meMarker.remove();
+    meMarker = L.marker(latlng, {
+      icon: L.divIcon({ className: "", html: '<div class="me"></div>', iconSize: [16, 16], iconAnchor: [8, 8] }),
+      zIndexOffset: 1000
+    }).addTo(map).bindTooltip(label);
+    fetchPlaces();
+  }
+
+  // ---------- Data ----------
+  async function fetchPlaces() {
+    const r = +radiusSel.value;
+    const [lat, lon] = center;
+    const key = `${lat.toFixed(5)},${lon.toFixed(5)},${r}`;
+    lastQueryKey = key;
+
+    if (radiusCircle) radiusCircle.remove();
+    radiusCircle = L.circle(center, {
+      radius: r, color: "#B8323F", weight: 1, fillOpacity: 0.04, dashArray: "4 4"
+    }).addTo(map);
+    map.fitBounds(radiusCircle.getBounds(), { padding: [20, 20] });
+
+    setStatus(`Searching food places within ${fmtDist(r)}…`);
+    listEl.innerHTML = '<div class="empty">Loading…</div>';
+
+    const around = `(around:${r},${lat},${lon})`;
+    const q = `[out:json][timeout:25];
+(
+  nwr["amenity"~"^(restaurant|cafe|fast_food|food_court|bar|pub|biergarten|ice_cream)$"]${around};
+  nwr["shop"~"^(bakery|pastry|confectionery|deli)$"]${around};
+);
+out center tags 300;`;
+
+    let data = null, lastErr = null;
+    for (const endpoint of OVERPASS) {
+      try {
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: "data=" + encodeURIComponent(q)
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        data = await res.json();
+        break;
+      } catch (err) { lastErr = err; }
+    }
+    if (key !== lastQueryKey) return; // a newer search started meanwhile
+    if (!data) {
+      setStatus("The places server is busy right now. Wait a few seconds and try again.", true);
+      listEl.innerHTML = '<div class="empty">No results loaded.</div>';
+      console.error(lastErr);
+      return;
+    }
+
+    places = data.elements
+      .map((el) => {
+        const p = el.type === "node" ? [el.lat, el.lon] : el.center ? [el.center.lat, el.center.lon] : null;
+        if (!p) return null;
+        const t = el.tags || {};
+        return {
+          id: `${el.type}/${el.id}`,
+          name: t.name || t["name:en"] || t["name:az"] || "Unnamed place",
+          named: Boolean(t.name || t["name:en"] || t["name:az"]),
+          cat: categorize(t),
+          latlng: p,
+          dist: haversine(center, p),
+          cuisine: (t.cuisine || "").replace(/_/g, " ").replace(/;/g, ", "),
+          hours: t.opening_hours || "",
+          phone: t.phone || t["contact:phone"] || "",
+          website: t.website || t["contact:website"] || "",
+          street: [t["addr:street"], t["addr:housenumber"]].filter(Boolean).join(" ")
+        };
+      })
+      .filter(Boolean);
+
+    // Order by distance, with unnamed places pushed to the end
+    places.sort((a, b) => (a.named === b.named ? a.dist - b.dist : a.named ? -1 : 1));
+    selectedId = null;
+    render();
+  }
+
+  // ---------- Render ----------
+  function visible() {
+    return places.filter((p) =>
+      (filter === "all" || p.cat === filter) && (!openOnly.checked || p.hours));
+  }
+
+  function renderChips() {
+    const counts = { all: places.length };
+    places.forEach((p) => { counts[p.cat] = (counts[p.cat] || 0) + 1; });
+    chipsEl.innerHTML = CATEGORIES
+      .filter((c) => c.key === "all" || counts[c.key])
+      .map((c) => `<button type="button" class="chip" data-k="${c.key}" aria-pressed="${filter === c.key}">${c.label}<span class="n">${counts[c.key] || 0}</span></button>`)
+      .join("");
+  }
+  chipsEl.addEventListener("click", (e) => {
+    const b = e.target.closest(".chip");
+    if (!b) return;
+    filter = b.dataset.k;
+    render();
+  });
+
+  function pinIcon(p) {
+    const cls = p.cat === "restaurant" ? "restaurant" : "other";
+    const sel = p.id === selectedId ? " sel" : "";
+    const size = sel ? 20 : 14;
+    return L.divIcon({
+      className: "",
+      html: `<div class="pin ${cls}${sel}"></div>`,
+      iconSize: [size, size],
+      iconAnchor: [size / 2, size / 2]
+    });
+  }
+
+  function render() {
+    renderChips();
+    const items = visible();
+    placeLayer.clearLayers();
+    markers.clear();
+
+    if (!center) return;
+    if (!items.length) {
+      listEl.innerHTML = '<div class="empty">Nothing found here. Try a bigger radius or another filter.</div>';
+      setStatus(places.length ? "No places match this filter." : "No food places found in this radius.");
+      return;
+    }
+    setStatus(`${items.length} place${items.length === 1 ? "" : "s"} · nearest ${fmtDist(items[0].dist)} away`);
+
+    listEl.innerHTML = items.map((p) => {
+      const mins = Math.max(1, Math.round(p.dist / WALK_M_PER_MIN));
+      const gmaps = `https://www.google.com/maps/dir/?api=1&destination=${p.latlng[0]},${p.latlng[1]}`;
+      const osm = `https://www.openstreetmap.org/${p.id}`;
+      return `
+      <div class="place${p.id === selectedId ? " active" : ""}" data-id="${esc(p.id)}" tabindex="0" role="button">
+        <div class="name">${esc(p.name)}</div>
+        <div class="dist">${fmtDist(p.dist)}</div>
+        <div class="meta">
+          <span class="tag ${p.cat}">${LABEL[p.cat]}</span>
+          ${p.cuisine ? `<span>${esc(p.cuisine)}</span>` : ""}
+        </div>
+        <div class="walk">${mins} min walk</div>
+        <div class="extra">
+          ${p.street ? `<div>📍 ${esc(p.street)}</div>` : ""}
+          ${p.hours ? `<div>Hours: ${esc(p.hours)}</div>` : "<div>Hours not listed</div>"}
+          ${p.phone ? `<div>Phone: <span style="user-select:all">${esc(p.phone)}</span></div>` : ""}
+          <div class="links">
+            <a href="${gmaps}" target="_blank" rel="noopener">Directions ↗</a>
+            ${p.website ? `<a href="${esc(p.website)}" target="_blank" rel="noopener">Website ↗</a>` : ""}
+            <a href="${osm}" target="_blank" rel="noopener">OSM ↗</a>
+          </div>
+        </div>
+      </div>`;
+    }).join("");
+
+    items.forEach((p) => {
+      const m = L.marker(p.latlng, { icon: pinIcon(p) })
+        .bindPopup(`<strong>${esc(p.name)}</strong><br>${LABEL[p.cat]} · ${fmtDist(p.dist)}`)
+        .on("click", () => select(p.id, false));
+      m.addTo(placeLayer);
+      markers.set(p.id, m);
+    });
+  }
+
+  function select(id, fromList) {
+    selectedId = selectedId === id && fromList ? null : id;
+    render();
+    const p = places.find((x) => x.id === id);
+    if (p && selectedId) {
+      if (fromList) map.panTo(p.latlng);
+      markers.get(id)?.openPopup();
+      listEl.querySelector(`[data-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: "nearest" });
+    }
+  }
+  listEl.addEventListener("click", (e) => {
+    if (e.target.closest("a")) return;
+    const el = e.target.closest(".place");
+    if (el) select(el.dataset.id, true);
+  });
+  listEl.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const el = e.target.closest(".place");
+    if (el) { e.preventDefault(); select(el.dataset.id, true); }
+  });
+
+  renderChips();
+})();
+</script>
+</body>
+</html>
